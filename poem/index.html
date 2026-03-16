@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>poetry workshop</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #f5f1ea;
+    --surface: #faf7f2;
+    --text:    #2a2320;
+    --muted:   #9a8a7a;
+    --accent:  #8b5e3c;
+    --active:  #c9a97a;
+    --border:  #ddd4c4;
+    --hover:   #ede5d8;
+  }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── header ── */
+  header {
+    padding: 0.8rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: baseline;
+    gap: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  .title {
+    font-size: 1rem;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  /* ── layout ── */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 370px 1fr;
+    overflow: hidden;
+  }
+
+  /* ── sidebar ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    padding: 1.6rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.8rem;
+  }
+
+  .panel { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .panel-title {
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'Courier New', monospace;
+  }
+
+  .panel-note {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  .panel-effect {
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-style: italic;
+    min-height: 1.1em;
+    transition: opacity 0.3s;
+  }
+
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.25rem;
+    margin-top: 0.15rem;
+  }
+
+  .opt {
+    font-family: Georgia, serif;
+    font-size: 0.82rem;
+    padding: 0.22rem 0.65rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  .opt:hover  { background: var(--hover); }
+  .opt.active { background: var(--active); border-color: #b8935a; }
+
+  .anchor-wrap { margin-top: 0.15rem; }
+
+  .anchor-input {
+    font-family: Georgia, serif;
+    font-size: 0.9rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    outline: none;
+    padding: 0.25rem 0.1rem;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+
+  .anchor-input:focus { border-bottom-color: var(--accent); }
+  .anchor-input::placeholder { color: var(--muted); font-style: italic; font-size: 0.82rem; }
+
+  /* ── poem panel ── */
+  .poem-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .poem-output {
+    flex: 1;
+    padding: 3.5rem 5rem 2rem 4.5rem;
+    overflow-y: auto;
+  }
+
+  .poem-line {
+    display: block;
+    font-size: 1.15rem;
+    line-height: 2.1;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .poem-line.visible  { opacity: 1; transform: none; }
+  .poem-line.spacer   { height: 1.1em; }
+
+  .poem-note {
+    margin-top: 2.5rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-style: italic;
+    line-height: 1.7;
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+
+  .poem-note.visible { opacity: 1; }
+
+  .poem-actions {
+    padding: 0.9rem 4.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .action-btn {
+    font-family: Georgia, serif;
+    font-size: 0.82rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.28rem 0.75rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .action-btn:hover { background: var(--hover); }
+
+  .flash {
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.3s;
+    margin-left: 0.3rem;
+  }
+
+  .flash.on { opacity: 1; }
+
+  /* ── scrollbar ── */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">poetry workshop</span>
+  <span class="subtitle">make decisions. watch the poem change.</span>
+</header>
+
+<main>
+
+  <!-- ── SIDEBAR ── -->
+  <div class="sidebar">
+
+    <div class="panel" id="p-feeling">
+      <div class="panel-title">feeling</div>
+      <div class="panel-note">The emotional center — not the subject, but what the poem is trying to hold. Be specific. Not "sad" but which shade of it.</div>
+      <div class="options" id="opts-feeling"></div>
+      <div class="panel-effect" id="eff-feeling"></div>
+    </div>
+
+    <div class="panel" id="p-anchor">
+      <div class="panel-title">the anchor</div>
+      <div class="panel-note">The concrete image that carries the feeling. Abstractions slide off the mind; specific things grip it. What can you see, touch, or hear?</div>
+      <div class="anchor-wrap">
+        <input class="anchor-input" id="anchorInput" type="text"
+               placeholder="e.g. an old window, my mother's hands, 3am">
+      </div>
+    </div>
+
+    <div class="panel" id="p-form">
+      <div class="panel-title">form</div>
+      <div class="panel-note">The shape of how meaning moves. A line break isn't just where you ran out of room — it's where the reader pauses, what gets weight.</div>
+      <div class="options" id="opts-form"></div>
+      <div class="panel-effect" id="eff-form"></div>
+    </div>
+
+    <div class="panel" id="p-sound">
+      <div class="panel-title">sound texture</div>
+      <div class="panel-note">Poetry is heard before it's understood. Hard consonants create tension; liquid sounds dissolve it. Sound is subliminal mood.</div>
+      <div class="options" id="opts-sound"></div>
+      <div class="panel-effect" id="eff-sound"></div>
+    </div>
+
+    <div class="panel" id="p-voice">
+      <div class="panel-title">voice</div>
+      <div class="panel-note">Who speaks changes everything. "I" confesses. "You" implicates the reader or addresses someone absent. "They" observes from outside.</div>
+      <div class="options" id="opts-voice"></div>
+      <div class="panel-effect" id="eff-voice"></div>
+    </div>
+
+    <div class="panel" id="p-turn">
+      <div class="panel-title">the turn</div>
+      <div class="panel-note">The best poems don't hold one note. A volta — a shift in what the poem is saying or how it sees — is what makes a poem feel complete rather than just finished.</div>
+      <div class="options" id="opts-turn"></div>
+      <div class="panel-effect" id="eff-turn"></div>
+    </div>
+
+  </div>
+
+  <!-- ── POEM PANEL ── -->
+  <div class="poem-panel">
+    <div class="poem-output" id="poemOutput">
+      <div class="poem-note" id="poemNote"></div>
+    </div>
+    <div class="poem-actions">
+      <button class="action-btn" id="regenBtn">try again</button>
+      <button class="action-btn" id="copyBtn">copy</button>
+      <button class="action-btn" id="saveBtn">save .txt</button>
+      <span class="flash" id="flash"></span>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// METADATA
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FEELINGS = {
+  melancholy: {
+    label: 'melancholy',
+    effect: 'holds what is quiet and already past',
+    note_suffix: 'the poem settles into slow ache, the texture of what remains',
+  },
+  longing: {
+    label: 'longing',
+    effect: 'holds the space between wanting and having',
+    note_suffix: 'the poem leans forward into distance',
+  },
+  joy: {
+    label: 'joy',
+    effect: 'holds the sudden permission to be fully here',
+    note_suffix: 'the poem opens into brightness',
+  },
+  anger: {
+    label: 'anger',
+    effect: 'holds what has been swallowed too long',
+    note_suffix: 'the poem holds its ground, doesn\'t look away',
+  },
+  peace: {
+    label: 'peace',
+    effect: 'holds the moment of not needing anything more',
+    note_suffix: 'the poem rests in what is already here',
+  },
+  wonder: {
+    label: 'wonder',
+    effect: 'holds the strangeness of ordinary things',
+    note_suffix: 'the poem stays open to being surprised',
+  },
+};
+
+const FORMS = {
+  short_lines: {
+    label: 'short lines',
+    effect: 'each line a separate weight — silence between words',
+  },
+  long_breath: {
+    label: 'long breath',
+    effect: 'one unbroken movement, meaning building as it goes',
+  },
+  couplets: {
+    label: 'couplets',
+    effect: 'paired thoughts that lean against each other',
+  },
+  list: {
+    label: 'a list',
+    effect: 'accumulation — things adding up to something larger',
+  },
+  before_after: {
+    label: 'before & after',
+    effect: 'two moments, a shift held between them',
+  },
+};
+
+const SOUNDS = {
+  soft: {
+    label: 'soft & liquid',
+    effect: 'l, m, n, r — the poem murmurs',
+  },
+  hard: {
+    label: 'hard & percussive',
+    effect: 'k, t, p, b — the poem strikes',
+  },
+  open: {
+    label: 'long & open',
+    effect: 'wide vowels — the poem breathes out',
+  },
+  clipped: {
+    label: 'clipped & spare',
+    effect: 'brief syllables — the poem holds back',
+  },
+};
+
+const VOICES = {
+  I:    { label: 'I',    effect: 'close, confessional, inside the experience' },
+  you:  { label: 'you',  effect: 'intimate — implicates the reader, or addresses someone absent' },
+  they: { label: 'they', effect: 'observational — a step back from inside' },
+  we:   { label: 'we',   effect: 'shared — pulls reader into the poem\'s world' },
+  one:  { label: 'one',  effect: 'universal — one becomes everyone, and no one' },
+};
+
+const TURNS = {
+  end:    { label: 'at the end',  effect: 'revelation or reversal in the closing lines' },
+  midway: { label: 'midway',      effect: 'the poem surprises itself halfway through' },
+  none:   { label: 'none',        effect: 'the poem holds the same note all the way through' },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LINE BANK
+// L(text, moods, sound, position)
+// position: 'open' | 'mid' | 'close' | 'turn'
+// sound:    'soft' | 'hard' | 'open' | 'clipped' | 'any'
+// ─────────────────────────────────────────────────────────────────────────────
+
+const L = (t, m, s, p) => ({ t, m: m.split(','), s, p });
+
+const LINES = [
+
+  // ── MELANCHOLY ──────────────────────────────────────────────────────────
+
+  // opening
+  L("the __A__ holds what I haven't been able to say",             'melancholy,longing', 'soft',    'open'),
+  L("I go back to the __A__ the way you return to an unfinished sentence", 'melancholy', 'soft',    'open'),
+  L("the __A__ is the shape the years left behind",                'melancholy',         'soft',    'open'),
+  L("I left the __A__ a long time ago. It stayed.",                'melancholy',         'clipped', 'open'),
+  L("the __A__ sits in the same place it always did",              'melancholy',         'clipped', 'open'),
+
+  // middle — no anchor
+  L("what is lost does not announce itself",                       'melancholy',         'soft',    'mid'),
+  L("I have been learning the difference between sorrow and the fact of things", 'melancholy', 'soft', 'mid'),
+  L("the years have a texture I can only recognize looking back",  'melancholy',         'soft',    'mid'),
+  L("I go on. This is not the same as being fine.",                'melancholy',         'clipped', 'mid'),
+  L("there are rooms I cannot return to even in memory",           'melancholy',         'soft',    'mid'),
+  L("I keep what I have no use for",                               'melancholy',         'clipped', 'mid'),
+  L("things break. This one broke quietly.",                       'melancholy',         'clipped', 'mid'),
+  L("some things you put down and they don't come back",           'melancholy',         'clipped', 'mid'),
+  L("I did not cry at the time",                                   'melancholy',         'clipped', 'mid'),
+  L("the calendar kept moving and I let it",                       'melancholy',         'any',     'mid'),
+
+  // middle — anchor
+  L("the __A__ in the late light, patient as something with nowhere to go", 'melancholy', 'soft', 'mid'),
+  L("I carry the __A__ in the way you carry something without knowing it",  'melancholy', 'soft', 'mid'),
+  L("the __A__ in the low seasons, which are most seasons now",             'melancholy', 'soft', 'mid'),
+
+  // turn
+  L("and yet the __A__ holds, and I find something in this I cannot name",  'melancholy', 'soft',    'turn'),
+  L("but I'm still here. The __A__ is too.",                                'melancholy', 'clipped', 'turn'),
+  L("except there is this: the __A__, still",                               'melancholy', 'any',     'turn'),
+
+  // closing
+  L("the __A__ remembers what I have slowly learned to carry",         'melancholy', 'soft',    'close'),
+  L("the __A__ remains. I find this, unexpectedly, enough.",           'melancholy', 'soft',    'close'),
+  L("I leave the __A__ as I found it. It asks nothing. I am grateful.",'melancholy', 'soft',    'close'),
+  L("just the __A__. Still there. Still enough.",                      'melancholy', 'clipped', 'close'),
+  L("the __A__ now. That is what is left.",                            'melancholy', 'clipped', 'close'),
+
+  // ── LONGING ─────────────────────────────────────────────────────────────
+
+  L("the __A__ is the distance I haven't learned to measure",         'longing', 'soft',    'open'),
+  L("I have been turning toward the __A__ for longer than I can say", 'longing', 'soft',    'open'),
+  L("everything I want is on the other side of the __A__",            'longing', 'any',     'open'),
+
+  L("distance has its own quality of light, its own patience",        'longing', 'soft',    'mid'),
+  L("I have been practicing arrival, rehearsing what I would say",    'longing', 'soft',    'mid'),
+  L("the space between here and there is full of the going",          'longing', 'open',    'mid'),
+  L("I watch things the way you watch something slowly moving away",  'longing', 'soft',    'mid'),
+  L("what I want is not far. That's the difficult part.",             'longing', 'clipped', 'mid'),
+  L("I have been standing at the edge of the __A__ for a long time",  'longing', 'soft',    'mid'),
+  L("the __A__ holds still while I move toward it",                   'longing', 'soft',    'mid'),
+  L("I watch the __A__ catch the last light and think: almost",       'longing', 'soft',    'mid'),
+  L("I know what I want. Knowing doesn't help.",                      'longing', 'clipped', 'mid'),
+  L("I reach. The __A__ doesn't reach back.",                         'longing', 'clipped', 'mid'),
+
+  L("and yet the reaching is its own kind of arriving",               'longing', 'soft',    'turn'),
+  L("but the __A__ has its own patience. I find, so do I.",           'longing', 'soft',    'turn'),
+  L("except: here I am. The __A__ is there. That is a beginning.",    'longing', 'any',     'turn'),
+
+  L("the __A__ still there. I am still almost there. Almost.",        'longing', 'soft',    'close'),
+  L("the reaching has its own shape, its own form of rest",           'longing', 'soft',    'close'),
+  L("I keep turning toward the __A__. This is not nothing.",          'longing', 'clipped', 'close'),
+
+  // ── JOY ─────────────────────────────────────────────────────────────────
+
+  L("the __A__ arrived and I wasn't expecting it",                    'joy', 'any',     'open'),
+  L("something about the __A__ today — the exact way it caught light",'joy', 'soft',    'open'),
+  L("I found the __A__ and everything, briefly, opened",              'joy', 'open',    'open'),
+
+  L("there are days when the light decides to be generous",           'joy', 'soft',    'mid'),
+  L("I said yes to the whole afternoon and the afternoon agreed",     'joy', 'open',    'mid'),
+  L("the body, given permission, knows how to be glad",               'joy', 'soft',    'mid'),
+  L("I keep forgetting this is possible, and then I remember",        'joy', 'soft',    'mid'),
+  L("everything arrived at once and I had no idea what to do with it",'joy', 'soft',    'mid'),
+  L("I have been given more than I can hold and I'm trying",          'joy', 'soft',    'mid'),
+  L("the __A__ bright and certain, the way only simple things are",   'joy', 'open',    'mid'),
+  L("the __A__ like a word I had been trying to remember",            'joy', 'soft',    'mid'),
+  L("the world is briefly larger than I remember it",                 'joy', 'open',    'mid'),
+  L("everything sudden, everything allowed",                          'joy', 'clipped', 'mid'),
+
+  L("not always, but today, the __A__ is enough to fill everything",  'joy', 'open',    'turn'),
+  L("and I knew, watching the __A__, that some things don't ask permission to be good", 'joy', 'soft', 'turn'),
+
+  L("the __A__ stays. I stay with it. That's plenty.",                'joy', 'clipped', 'close'),
+  L("the __A__ and the afternoon and nothing more needed right now",  'joy', 'soft',    'close'),
+  L("I thank the __A__ quietly, the way you thank something that doesn't know it helped", 'joy', 'soft', 'close'),
+
+  // ── ANGER ───────────────────────────────────────────────────────────────
+
+  L("the __A__ is not enough. It was never enough.",                  'anger', 'hard',   'open'),
+  L("I have swallowed the __A__ for the last time",                   'anger', 'hard',   'open'),
+  L("here is the __A__. Here is what it cost.",                       'anger', 'clipped','open'),
+
+  L("I said no. I should have said it sooner, louder, clearer.",      'anger', 'hard',   'mid'),
+  L("some things don't deserve patience and I gave them years of it", 'anger', 'hard',   'mid'),
+  L("I built it carefully. Then I watched it not matter.",            'anger', 'clipped','mid'),
+  L("I have been quiet about this long past the point of reason",     'anger', 'soft',   'mid'),
+  L("I know what this was. I don't need to pretend otherwise.",       'anger', 'clipped','mid'),
+  L("there is a thing inside the __A__ I am done pretending isn't there", 'anger', 'hard', 'mid'),
+  L("I have learned that anger is sometimes the most honest thing",   'anger', 'soft',   'mid'),
+  L("the __A__ shows me who I am when I stop performing calm",        'anger', 'soft',   'mid'),
+  L("I gave the __A__ more than it deserved",                         'anger', 'clipped','mid'),
+  L("the __A__ cost me. I'm counting now.",                           'anger', 'hard',   'mid'),
+
+  L("but the __A__ is mine now. It knows it.",                        'anger', 'hard',   'turn'),
+  L("and underneath the __A__ is something harder and more true",     'anger', 'hard',   'turn'),
+  L("except: I'm still here. That's the part they didn't expect.",    'anger', 'clipped','turn'),
+
+  L("I take the __A__ back. I was wrong to leave it there so long.",  'anger', 'hard',   'close'),
+  L("the __A__ and my refusal. Both still standing.",                 'anger', 'clipped','close'),
+  L("I am done apologizing for the __A__. Completely done.",          'anger', 'hard',   'close'),
+
+  // ── PEACE ───────────────────────────────────────────────────────────────
+
+  L("the __A__ has been here all along, waiting for me to notice",    'peace', 'soft',   'open'),
+  L("I stopped. The __A__ was there.",                                'peace', 'clipped','open'),
+  L("I did nothing. I sat with the __A__. That was enough.",          'peace', 'soft',   'open'),
+
+  L("there is a stillness that is not the absence of things",         'peace', 'soft',   'mid'),
+  L("the afternoon holds itself without any help from me",            'peace', 'soft',   'mid'),
+  L("I do not need to make anything of this",                         'peace', 'soft',   'mid'),
+  L("what is here is enough. I keep forgetting this.",                'peace', 'soft',   'mid'),
+  L("I have been practicing doing less",                              'peace', 'clipped','mid'),
+  L("breath in. Then out. The __A__ doesn't need anything from me.",  'peace', 'soft',   'mid'),
+  L("the __A__ quiet and undemanding, the way rested things are",     'peace', 'soft',   'mid'),
+  L("the __A__ and the light and the fact that I'm here",             'peace', 'open',   'mid'),
+  L("I stop counting the things I lack",                              'peace', 'clipped','mid'),
+  L("nothing is happening. I am grateful for this.",                  'peace', 'any',    'mid'),
+
+  L("and it occurs to me that this is the whole of it",               'peace', 'soft',   'turn'),
+  L("and the __A__ has no lesson for me today, and I accept this",    'peace', 'soft',   'turn'),
+
+  L("the __A__, the quiet, the sufficient afternoon. That is all.",   'peace', 'soft',   'close'),
+  L("nothing is resolved. Everything is fine.",                       'peace', 'clipped','close'),
+  L("I leave the __A__ as I found it. This is the right thing.",      'peace', 'soft',   'close'),
+
+  // ── WONDER ──────────────────────────────────────────────────────────────
+
+  L("the __A__ is not what I thought it was",                         'wonder', 'soft',  'open'),
+  L("I looked at the __A__ long enough that it began to change",      'wonder', 'open',  'open'),
+  L("the __A__ opened today in a way that things don't usually open", 'wonder', 'soft',  'open'),
+
+  L("the world contains more than I have been accounting for",        'wonder', 'open',  'mid'),
+  L("I have been thinking too small, too bounded, too certain",       'wonder', 'soft',  'mid'),
+  L("there are whole systems in ordinary things I'll never understand",'wonder', 'soft', 'mid'),
+  L("I keep finding edges I didn't know were there",                  'wonder', 'soft',  'mid'),
+  L("something is always becoming something else, right now, right here", 'wonder', 'open', 'mid'),
+  L("the __A__ behaves as if it has a life I cannot see from here",   'wonder', 'soft',  'mid'),
+  L("the __A__ announces itself, strange and particular and entire",  'wonder', 'open',  'mid'),
+  L("I ask the question and the question does something unexpected",  'wonder', 'soft',  'mid'),
+  L("small things turn out to be inexhaustible",                      'wonder', 'soft',  'mid'),
+  L("the __A__ is patient. I am not. This is the difference between us.", 'wonder', 'clipped', 'mid'),
+
+  L("but here is the __A__, patient, specific, not asking to be understood", 'wonder', 'soft', 'turn'),
+  L("and the __A__ doesn't wonder. It just is. I find this corrective.", 'wonder', 'soft', 'turn'),
+
+  L("I put the __A__ down changed. I don't know how else to say it.", 'wonder', 'soft',  'close'),
+  L("the __A__ returns to being itself. I return to being astonished.",'wonder', 'open', 'close'),
+  L("the __A__ and the question of the __A__, both still open.",       'wonder', 'soft',  'close'),
+
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANAPHORA (for list form)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ANAPHORA = {
+  melancholy: ['There is', 'I think of', 'I keep', 'What remains is', 'There is still'],
+  longing:    ['There is', 'I reach toward', 'I think of', 'Somewhere there is'],
+  joy:        ['There is', 'There was', 'I remember', 'And there is'],
+  anger:      ['There is', 'I know', 'I have carried', 'There was'],
+  peace:      ['There is', 'Here is', 'There is only', 'I have found'],
+  wonder:     ['There is', 'What if', 'Here is', 'There is still'],
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickN(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(n, shuffled.length));
+}
+
+function pool(feeling, sound) {
+  // Prefer exact sound match, then 'any', then loose match
+  return LINES.filter(l => {
+    if (!l.m.includes(feeling)) return false;
+    return l.s === sound || l.s === 'any';
+  });
+}
+
+function fallbackPool(feeling) {
+  // Any sound — used when the filtered pool is too small
+  return LINES.filter(l => l.m.includes(feeling));
+}
+
+function getLines(feeling, sound, pos, n) {
+  let matched = pool(feeling, sound).filter(l => l.p === pos);
+  if (matched.length < n) matched = fallbackPool(feeling).filter(l => l.p === pos);
+  if (matched.length < n) matched = LINES.filter(l => l.p === pos);
+  return pickN(matched, n);
+}
+
+function applyVoice(text, voice) {
+  switch (voice) {
+    case 'I': return text;
+    case 'you':
+      return text
+        .replace(/\bI've\b/g, "you've").replace(/\bI'm\b/g, "you're")
+        .replace(/\bI'd\b/g, "you'd").replace(/\bI'll\b/g, "you'll")
+        .replace(/\bmy\b/g, 'your').replace(/\bmine\b/g, 'yours')
+        .replace(/\bmyself\b/g, 'yourself').replace(/\bme\b/g, 'you')
+        .replace(/\bI\b/g, 'you');
+    case 'they':
+      return text
+        .replace(/\bI've\b/g, "they've").replace(/\bI'm\b/g, "they're")
+        .replace(/\bI'd\b/g, "they'd").replace(/\bI'll\b/g, "they'll")
+        .replace(/\bmy\b/g, 'their').replace(/\bmine\b/g, 'theirs')
+        .replace(/\bmyself\b/g, 'themselves').replace(/\bme\b/g, 'them')
+        .replace(/\bI\b/g, 'they');
+    case 'we':
+      return text
+        .replace(/\bI've\b/g, "we've").replace(/\bI'm\b/g, "we're")
+        .replace(/\bI'd\b/g, "we'd").replace(/\bI'll\b/g, "we'll")
+        .replace(/\bmy\b/g, 'our').replace(/\bmine\b/g, 'ours')
+        .replace(/\bmyself\b/g, 'ourselves').replace(/\bme\b/g, 'us')
+        .replace(/\bI\b/g, 'we');
+    case 'one':
+      return text
+        .replace(/\bI've\b/g, "one has").replace(/\bI'm\b/g, "one is")
+        .replace(/\bI'd\b/g, "one would").replace(/\bI'll\b/g, "one will")
+        .replace(/\bmy\b/g, "one's").replace(/\bmine\b/g, "one's own")
+        .replace(/\bmyself\b/g, 'oneself').replace(/\bme\b/g, 'one')
+        .replace(/\bI\b/g, 'one');
+    default: return text;
+  }
+}
+
+function applyAnchor(text, anchor) {
+  const a = anchor.trim() || 'it';
+  return text.replace(/__A__/g, a);
+}
+
+function generateLines(choices) {
+  const { feeling, anchor, form, sound, voice, turn } = choices;
+
+  const openLine  = getLines(feeling, sound, 'open',  1)[0];
+  const closeLine = getLines(feeling, sound, 'close', 1)[0];
+  const turnLine  = turn !== 'none' ? getLines(feeling, sound, 'turn', 1)[0] : null;
+
+  // middle line count by form
+  const midCounts = {
+    short_lines:  7,
+    long_breath:  5,
+    couplets:     4,
+    list:         5,
+    before_after: 4,
+  };
+
+  const n    = midCounts[form] || 5;
+  const mids = getLines(feeling, sound, 'mid', n).map(l => l.t);
+
+  // assemble: open → mids → turn (optional) → close
+  let lines = [openLine.t, ...mids];
+
+  if (turn === 'midway' && turnLine) {
+    const mid = Math.floor(lines.length / 2);
+    lines.splice(mid, 0, turnLine.t);
+  }
+
+  lines.push(closeLine.t);
+
+  if (turn === 'end' && turnLine) {
+    // insert turn before final closing line
+    lines.splice(lines.length - 1, 0, turnLine.t);
+  }
+
+  // apply form structure
+  lines = applyForm(lines, form, feeling);
+
+  // apply voice and anchor
+  return lines.map(l => {
+    if (l === '') return '';
+    return applyAnchor(applyVoice(l, voice), anchor);
+  });
+}
+
+function applyForm(lines, form, feeling) {
+  switch (form) {
+
+    case 'long_breath': {
+      // join some consecutive lines with a comma for a more flowing feel
+      const out = [];
+      let i = 0;
+      while (i < lines.length) {
+        if (i < lines.length - 2 && Math.random() < 0.35) {
+          const joined = lines[i] + ', ' + lines[i + 1].toLowerCase().replace(/^(i |the |what |there )/, m => m);
+          out.push(joined);
+          i += 2;
+        } else {
+          out.push(lines[i]);
+          i++;
+        }
+      }
+      return out;
+    }
+
+    case 'short_lines': {
+      // split each line into shorter chunks (break at commas / conjunctions)
+      const out = [];
+      for (const line of lines) {
+        const parts = line
+          .split(/,\s*|(?<=\w)\s+(?=and |but |yet |so |or |when |while |as |the |I |that )/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        if (parts.length > 1) out.push(...parts);
+        else out.push(line);
+      }
+      return out;
+    }
+
+    case 'couplets': {
+      // blank line between every pair
+      const out = [];
+      for (let i = 0; i < lines.length; i++) {
+        out.push(lines[i]);
+        if (i % 2 === 1 && i < lines.length - 1) out.push('');
+      }
+      return out;
+    }
+
+    case 'list': {
+      // wrap middle lines in anaphoric prefix
+      const prefixes = ANAPHORA[feeling] || ['There is'];
+      return lines.map((l, i) => {
+        if (i === 0 || i === lines.length - 1) return l;
+        const cleaned = l.replace(/^I\s+/i, '').replace(/^there is /i, '').toLowerCase();
+        return pick(prefixes) + ' — ' + cleaned;
+      });
+    }
+
+    case 'before_after': {
+      // split with a blank line stanza break
+      const half = Math.ceil(lines.length / 2);
+      return [...lines.slice(0, half), '', ...lines.slice(half)];
+    }
+
+    default:
+      return lines;
+  }
+}
+
+function buildPoem(choices) {
+  return generateLines(choices);
+}
+
+function poemAsText(lines) {
+  return lines.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+const choices = {
+  feeling: 'melancholy',
+  anchor:  '',
+  form:    'short_lines',
+  sound:   'soft',
+  voice:   'I',
+  turn:    'end',
+};
+
+let poemLines = [];
+let debounceTimer = null;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function renderPoem() {
+  poemLines = buildPoem(choices);
+
+  const container = document.getElementById('poemOutput');
+  const noteEl    = document.getElementById('poemNote');
+
+  // remove old lines but keep the note element
+  container.querySelectorAll('.poem-line').forEach(el => el.remove());
+  noteEl.classList.remove('visible');
+
+  // note text
+  const f  = FEELINGS[choices.feeling];
+  const fm = FORMS[choices.form];
+  noteEl.textContent =
+    `${fm.effect}; ${f.note_suffix}.`;
+
+  // insert lines before note
+  poemLines.forEach((text, i) => {
+    const el = document.createElement('span');
+    el.className = 'poem-line' + (text === '' ? ' spacer' : '');
+    el.textContent = text;
+    container.insertBefore(el, noteEl);
+
+    setTimeout(() => {
+      el.classList.add('visible');
+      if (i === poemLines.length - 1) {
+        setTimeout(() => noteEl.classList.add('visible'), 200);
+      }
+    }, i * 60);
+  });
+
+  container.scrollTop = 0;
+}
+
+function setEffect(dimension, value) {
+  const meta = { feeling: FEELINGS, form: FORMS, sound: SOUNDS, voice: VOICES, turn: TURNS };
+  const el = document.getElementById(`eff-${dimension}`);
+  if (el && meta[dimension]?.[value]) {
+    el.textContent = meta[dimension][value].effect;
+  }
+}
+
+function scheduleRegen() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(renderPoem, 300);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUILD OPTION GROUPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildOpts(containerId, dimension, meta) {
+  const container = document.getElementById(containerId);
+  for (const [key, data] of Object.entries(meta)) {
+    const btn = document.createElement('button');
+    btn.className = 'opt' + (choices[dimension] === key ? ' active' : '');
+    btn.textContent = data.label;
+    btn.dataset.value = key;
+
+    btn.addEventListener('click', () => {
+      choices[dimension] = key;
+      container.querySelectorAll('.opt').forEach(b =>
+        b.classList.toggle('active', b.dataset.value === key));
+      setEffect(dimension, key);
+      scheduleRegen();
+    });
+
+    container.appendChild(btn);
+  }
+  setEffect(dimension, choices[dimension]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+
+buildOpts('opts-feeling', 'feeling', FEELINGS);
+buildOpts('opts-form',    'form',    FORMS);
+buildOpts('opts-sound',   'sound',   SOUNDS);
+buildOpts('opts-voice',   'voice',   VOICES);
+buildOpts('opts-turn',    'turn',    TURNS);
+
+// anchor input
+const anchorInput = document.getElementById('anchorInput');
+anchorInput.addEventListener('input', () => {
+  choices.anchor = anchorInput.value;
+  scheduleRegen();
+});
+
+// actions
+document.getElementById('regenBtn').addEventListener('click', renderPoem);
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = poemAsText(poemLines);
+  navigator.clipboard.writeText(text).then(() => flash('copied'));
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const text = poemAsText(poemLines);
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'poem.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  flash('saved');
+});
+
+function flash(msg) {
+  const el = document.getElementById('flash');
+  el.textContent = msg;
+  el.classList.add('on');
+  setTimeout(() => el.classList.remove('on'), 1800);
+}
+
+// first render
+renderPoem();
+</script>
+</body>
+</html>
