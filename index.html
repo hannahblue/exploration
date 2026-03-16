@@ -121,12 +121,12 @@
   .btn:hover:not(:disabled) { background: var(--word-hover); border-color: var(--text-muted); }
   .btn:disabled { opacity: 0.35; cursor: default; }
 
-  .current-indicator {
+  .indicator {
     margin-left: auto;
     font-size: 0.78rem;
     color: var(--text-muted);
     font-style: italic;
-    min-width: 120px;
+    min-width: 130px;
     text-align: right;
     transition: opacity 0.3s;
   }
@@ -147,6 +147,8 @@
     font-size: 1.1rem;
   }
 
+  /* ── fragments — three voices ── */
+
   .fragment {
     display: block;
     opacity: 0;
@@ -160,8 +162,63 @@
   }
 
   .fragment.pause { height: 0.9em; }
-
   .fragment.breath { color: var(--text-muted); }
+
+  /* human voice */
+  .fragment.user-line {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  /* claude voice */
+  .fragment.claude-line {
+    padding-left: 1.5rem;
+  }
+
+  /* thinking pulse while Claude works */
+  .fragment.thinking {
+    color: var(--text-muted);
+    font-style: italic;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50%       { opacity: 0.9; }
+  }
+
+  /* ── input area ── */
+  .prompt-area {
+    display: flex;
+    align-items: baseline;
+    margin: 0.1rem 0;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  .prompt-area.visible { opacity: 1; }
+
+  .prompt-input {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.1rem;
+    font-style: italic;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--accent);
+    outline: none;
+    flex: 1;
+    padding: 0;
+    line-height: 2.1;
+    transition: border-color 0.2s;
+  }
+
+  .prompt-input:focus { border-bottom-color: var(--accent); }
+
+  .prompt-input::placeholder {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
 
   /* ── graph panel ── */
   .graph {
@@ -230,7 +287,7 @@
     <button class="btn" id="wanderBtn">wander</button>
     <button class="btn" id="stopBtn" disabled>stop</button>
   </div>
-  <span class="current-indicator" id="indicator"></span>
+  <span class="indicator" id="indicator"></span>
 </header>
 
 <main>
@@ -336,7 +393,7 @@ function neighbors(word, drift) {
   return close.length ? close : ALL_WORDS.slice();
 }
 
-function nextWord(current, trail, drift) {
+function nextStep(current, trail, drift) {
   let pool = neighbors(current, drift).filter(w => !trail.slice(-4).includes(w));
   if (!pool.length) pool = ALL_WORDS.filter(w => w !== current);
   return pick(pool);
@@ -350,22 +407,64 @@ function makeFragment(word, trail) {
     .replace(/%f/g, pick(candidates));
 }
 
-// ── ui helpers ────────────────────────────────────────────────────────────────
+function extractSeed(text) {
+  const words = text.toLowerCase().match(/\b[a-z]+\b/g) || [];
+  const known = words.filter(w => WORD_FIELD[w]);
+  return known.length ? pick(known) : null;
+}
+
+// ── ui state ──────────────────────────────────────────────────────────────────
+
+let running     = false;
+let stopFlag    = false;
+let resolveInput = null;
+let inputAreaEl  = null;
 
 const output    = document.getElementById('output');
 const indicator = document.getElementById('indicator');
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-function addFragment(text) {
+function setIndicator(text) { indicator.textContent = text; }
+
+function updateButtons() {
+  document.getElementById('stopBtn').disabled = !running;
+}
+
+// ── output helpers ────────────────────────────────────────────────────────────
+
+function addFragment(text, extraClass = '') {
   const el = document.createElement('div');
   el.className = 'fragment'
     + (text === '' ? ' pause' : '')
-    + (text === '...' || text === '—' ? ' breath' : '');
+    + (text === '...' || text === '—' ? ' breath' : '')
+    + (extraClass ? ' ' + extraClass : '');
   el.textContent = text;
   output.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
   output.scrollTop = output.scrollHeight;
+  return el;
+}
+
+async function addUserLine(text) {
+  const el = addFragment(text, 'user-line');
+  await sleep(30);
+  el.classList.add('visible');
+  output.scrollTop = output.scrollHeight;
+}
+
+async function addElaboration(text, delay) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    const el = document.createElement('div');
+    el.className = 'fragment claude-line';
+    el.textContent = line;
+    output.appendChild(el);
+    await sleep(30);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+    output.scrollTop = output.scrollHeight;
+    if (lines.length > 1) await sleep(delay * 0.6);
+  }
 }
 
 function highlight(word) {
@@ -374,23 +473,112 @@ function highlight(word) {
     c.classList.toggle('active', c.dataset.word === word));
   document.querySelectorAll('.field-label').forEach(l =>
     l.classList.toggle('active', l.dataset.field === field));
-  indicator.textContent = field ? `${word} · ${field}` : '';
+  if (field) setIndicator(`${word} · ${field}`);
 }
 
-// ── wander loop ───────────────────────────────────────────────────────────────
+// ── user input ────────────────────────────────────────────────────────────────
 
-let stopFlag = false;
-let running  = false;
+function waitForInput() {
+  return new Promise(resolve => {
+    resolveInput = resolve;
 
-async function wander(seed, steps, drift, delay) {
+    const area = document.createElement('div');
+    area.className = 'prompt-area';
+    inputAreaEl = area;
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'prompt-input';
+    inp.placeholder = 'add a line, or press Enter to drift on…';
+    inp.setAttribute('autocomplete', 'off');
+
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const val = inp.value;
+        area.remove();
+        inputAreaEl = null;
+        if (resolveInput) { resolveInput(val); resolveInput = null; }
+      }
+    });
+
+    area.appendChild(inp);
+    output.appendChild(area);
+    output.scrollTop = output.scrollHeight;
+
+    requestAnimationFrame(() => requestAnimationFrame(() => area.classList.add('visible')));
+    setTimeout(() => inp.focus(), 120);
+  });
+}
+
+function cancelInput(signal = '__stop__') {
+  if (resolveInput) { resolveInput(signal); resolveInput = null; }
+  if (inputAreaEl)  { inputAreaEl.remove(); inputAreaEl = null; }
+}
+
+// ── claude elaboration ────────────────────────────────────────────────────────
+
+async function elaborate(stanza, userLine) {
+  const thinkEl = addFragment('...', 'claude-line thinking');
+
+  let result = null;
+  try {
+    const res = await fetch('/api/elaborate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stanza, userLine }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      result = data.elaboration || null;
+    }
+  } catch (e) {
+    console.warn('Elaboration unavailable:', e.message);
+  }
+
+  thinkEl.remove();
+  return result;
+}
+
+// ── wander segment ────────────────────────────────────────────────────────────
+
+async function wanderSegment(startWord, startTrail, steps, drift, delay) {
+  let current = startWord;
+  let trail   = [...startTrail];
+  const stanzaLines = [];
+
+  for (let i = 0; i < steps && !stopFlag; i++) {
+    if (Math.random() < 0.12) {
+      const b = pick(BREATH);
+      addFragment(b);
+      if (b) stanzaLines.push(b);
+      await sleep(delay * 0.6);
+      continue;
+    }
+
+    const frag = makeFragment(current, trail);
+    addFragment(frag);
+    stanzaLines.push(frag);
+    await sleep(delay);
+
+    if (Math.random() < 0.18) addFragment('');
+
+    current = nextStep(current, trail, drift);
+    trail.push(current);
+    if (trail.length > 12) trail = trail.slice(-12);
+    highlight(current);
+  }
+
+  return { current, trail, stanza: stanzaLines.join('\n') };
+}
+
+// ── collaboration loop ────────────────────────────────────────────────────────
+
+async function runCollaboration(seed, drift, delay) {
   running  = true;
   stopFlag = false;
-  document.getElementById('wanderBtn').disabled = true;
-  document.getElementById('stopBtn').disabled   = false;
+  updateButtons();
 
-  let current = WORD_FIELD[seed]
-    ? seed
-    : pick(ALL_WORDS);
+  let current = WORD_FIELD[seed] ? seed : pick(ALL_WORDS);
 
   if (seed && !WORD_FIELD[seed]) {
     addFragment(seed);
@@ -401,42 +589,61 @@ async function wander(seed, steps, drift, delay) {
   let trail = [current];
   highlight(current);
 
-  for (let i = 0; i < steps && !stopFlag; i++) {
-    if (Math.random() < 0.12) {
-      addFragment(pick(BREATH));
-      await sleep(delay * 0.6);
-      continue;
+  while (!stopFlag) {
+    // wanderer's turn
+    const result = await wanderSegment(current, trail, 10, drift, delay);
+    if (stopFlag) break;
+
+    current = result.current;
+    trail   = result.trail;
+    const stanza = result.stanza;
+
+    // pause, invite a line
+    addFragment('');
+    setIndicator('listening…');
+    const userLine = await waitForInput();
+
+    if (stopFlag || userLine === '__stop__') break;
+
+    if (userLine.trim()) {
+      // human's turn
+      await addUserLine(userLine);
+      addFragment('');
+
+      // claude's turn
+      setIndicator('thinking…');
+      const elab = await elaborate(stanza, userLine);
+
+      if (elab && !stopFlag) {
+        await addElaboration(elab, delay);
+        // seed next wander from elaboration + user words
+        const newSeed = extractSeed(elab + ' ' + userLine);
+        if (newSeed) {
+          current = newSeed;
+          trail   = [current];
+          highlight(current);
+        }
+      }
     }
+    // empty → continue drifting from current position
 
-    addFragment(makeFragment(current, trail));
-    await sleep(delay);
-
-    if (Math.random() < 0.18) addFragment('');
-
-    current = nextWord(current, trail, drift);
-    trail.push(current);
-    if (trail.length > 12) trail = trail.slice(-12);
-    highlight(current);
+    addFragment('');
   }
 
-  addFragment('');
   running  = false;
   stopFlag = false;
-  indicator.textContent = '';
-  document.getElementById('wanderBtn').disabled = false;
-  document.getElementById('stopBtn').disabled   = true;
+  updateButtons();
+  setIndicator('');
 }
 
+// ── start / stop ──────────────────────────────────────────────────────────────
+
 function startWander(seed) {
+  stopFlag = true;
+  cancelInput();
+  output.innerHTML = '';
   const drift = parseFloat(document.getElementById('driftSlider').value);
-  if (running) {
-    stopFlag = true;
-    output.innerHTML = '';
-    setTimeout(() => wander(seed || 'drift', 28, drift, 350), 60);
-  } else {
-    output.innerHTML = '';
-    wander(seed || 'drift', 28, drift, 350);
-  }
+  setTimeout(() => runCollaboration(seed || 'drift', drift, 350), running ? 80 : 0);
 }
 
 // ── build graph ───────────────────────────────────────────────────────────────
@@ -483,14 +690,17 @@ document.getElementById('wanderBtn').addEventListener('click', () => {
   startWander(document.getElementById('seedInput').value.trim().toLowerCase());
 });
 
-document.getElementById('stopBtn').addEventListener('click', () => { stopFlag = true; });
+document.getElementById('stopBtn').addEventListener('click', () => {
+  stopFlag = true;
+  cancelInput();
+});
 
 document.getElementById('seedInput').addEventListener('keydown', e => {
   if (e.key === 'Enter')
     startWander(e.target.value.trim().toLowerCase());
 });
 
-// ── start ─────────────────────────────────────────────────────────────────────
+// ── init ──────────────────────────────────────────────────────────────────────
 
 startWander('drift');
 </script>
