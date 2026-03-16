@@ -205,6 +205,12 @@
 
   .flash.on { opacity: 1; }
 
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.2rem 0;
+  }
+
   /* ── scrollbar ── */
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -239,6 +245,24 @@
       </div>
     </div>
 
+    <div class="panel" id="p-contrast">
+      <div class="panel-title">a second image</div>
+      <div class="panel-note">Juxtaposition — two images placed near each other create meaning neither holds alone. What sits in contrast or tension with your anchor? The gap between them is where the poem lives.</div>
+      <div class="anchor-wrap">
+        <input class="anchor-input" id="contrastInput" type="text"
+               placeholder="e.g. an empty chair, the highway, smoke">
+      </div>
+    </div>
+
+    <div class="panel" id="p-time">
+      <div class="panel-title">the time</div>
+      <div class="panel-note">When does this happen? Season, time of day, a period of life. Specificity roots the poem in the real. "In November" or "at three in the morning" means something different than "sometimes."</div>
+      <div class="anchor-wrap">
+        <input class="anchor-input" id="timeInput" type="text"
+               placeholder="e.g. November, late afternoon, my twenties">
+      </div>
+    </div>
+
     <div class="panel" id="p-form">
       <div class="panel-title">form</div>
       <div class="panel-note">The shape of how meaning moves. A line break isn't just where you ran out of room — it's where the reader pauses, what gets weight.</div>
@@ -265,6 +289,26 @@
       <div class="panel-note">The best poems don't hold one note. A volta — a shift in what the poem is saying or how it sees — is what makes a poem feel complete rather than just finished.</div>
       <div class="options" id="opts-turn"></div>
       <div class="panel-effect" id="eff-turn"></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="panel" id="p-phrase">
+      <div class="panel-title">a phrase to keep</div>
+      <div class="panel-note">Many poems begin with a fragment that arrives unbidden — something overheard, a sentence, a rhythm you can't shake. If you have one, give it here. It'll appear in the poem as-is, in your own words.</div>
+      <div class="anchor-wrap">
+        <input class="anchor-input" id="phraseInput" type="text"
+               placeholder="e.g. it wasn't grief exactly, the door kept opening">
+      </div>
+    </div>
+
+    <div class="panel" id="p-echo">
+      <div class="panel-title">a recurring word</div>
+      <div class="panel-note">Repetition in poetry isn't redundancy — it's emphasis, incantation. One word, returned to, begins to carry the weight of the whole poem. It will appear alone on its own line, twice.</div>
+      <div class="anchor-wrap">
+        <input class="anchor-input" id="echoInput" type="text"
+               placeholder="e.g. still, hollow, enough, again">
+      </div>
     </div>
 
   </div>
@@ -385,7 +429,8 @@ const TURNS = {
 // sound:    'soft' | 'hard' | 'open' | 'clipped' | 'any'
 // ─────────────────────────────────────────────────────────────────────────────
 
-const L = (t, m, s, p) => ({ t, m: m.split(','), s, p });
+const L  = (t, m, s, p)        => ({ t, m: m.split(','), s, p });
+const LB = (t, m, s, p)        => ({ t, m: m.split(','), s, p, b: true }); // requires second image
 
 const LINES = [
 
@@ -525,6 +570,21 @@ const LINES = [
   L("nothing is resolved. Everything is fine.",                       'peace', 'clipped','close'),
   L("I leave the __A__ as I found it. This is the right thing.",      'peace', 'soft',   'close'),
 
+  // ── CONTRAST / JUXTAPOSITION (require second image __B__) ───────────────
+
+  LB("not the __A__, but the __B__, which is harder somehow",          'melancholy,longing', 'soft',    'mid'),
+  LB("I think of the __B__ the way I think of the __A__",             'melancholy,longing', 'soft',    'mid'),
+  LB("the __B__ where the __A__ was",                                  'melancholy',         'clipped', 'mid'),
+  LB("between the __A__ and the __B__, the whole distance",            'longing',            'soft',    'mid'),
+  LB("the __A__ on one side. The __B__ on the other.",                 'longing,melancholy', 'clipped', 'mid'),
+  LB("the __B__ says what the __A__ can't",                            'melancholy,wonder',  'soft',    'mid'),
+  LB("I can't explain the __A__ without the __B__",                    'melancholy,longing', 'soft',    'mid'),
+  LB("the __B__ has its own silence. So does the __A__.",              'peace,melancholy',   'soft',    'mid'),
+  LB("sometimes the __A__. Sometimes the __B__. Both real.",           'joy,wonder',         'any',     'mid'),
+  LB("the __A__ next to the __B__ — what that says",                   'wonder',             'soft',    'mid'),
+  LB("I gave the __A__ to the __B__. Neither keeps it.",               'melancholy,anger',   'soft',    'mid'),
+  LB("the __B__ arrived. I was still holding the __A__.",              'longing,melancholy', 'soft',    'mid'),
+
   // ── WONDER ──────────────────────────────────────────────────────────────
 
   L("the __A__ is not what I thought it was",                         'wonder', 'soft',  'open'),
@@ -577,23 +637,26 @@ function pickN(arr, n) {
   return shuffled.slice(0, Math.min(n, shuffled.length));
 }
 
-function pool(feeling, sound) {
-  // Prefer exact sound match, then 'any', then loose match
+function pool(feeling, sound, hasB) {
   return LINES.filter(l => {
     if (!l.m.includes(feeling)) return false;
+    if (l.b && !hasB) return false;   // skip contrast lines when no second image
     return l.s === sound || l.s === 'any';
   });
 }
 
-function fallbackPool(feeling) {
-  // Any sound — used when the filtered pool is too small
-  return LINES.filter(l => l.m.includes(feeling));
+function fallbackPool(feeling, hasB) {
+  return LINES.filter(l => {
+    if (!l.m.includes(feeling)) return false;
+    if (l.b && !hasB) return false;
+    return true;
+  });
 }
 
-function getLines(feeling, sound, pos, n) {
-  let matched = pool(feeling, sound).filter(l => l.p === pos);
-  if (matched.length < n) matched = fallbackPool(feeling).filter(l => l.p === pos);
-  if (matched.length < n) matched = LINES.filter(l => l.p === pos);
+function getLines(feeling, sound, pos, n, hasB = false) {
+  let matched = pool(feeling, sound, hasB).filter(l => l.p === pos);
+  if (matched.length < n) matched = fallbackPool(feeling, hasB).filter(l => l.p === pos);
+  if (matched.length < n) matched = LINES.filter(l => l.p === pos && (!l.b || hasB));
   return pickN(matched, n);
 }
 
@@ -632,19 +695,21 @@ function applyVoice(text, voice) {
   }
 }
 
-function applyAnchor(text, anchor) {
+function applyTokens(text, anchor, b) {
   const a = anchor.trim() || 'it';
-  return text.replace(/__A__/g, a);
+  let out = text.replace(/__A__/g, a);
+  if (b.trim()) out = out.replace(/__B__/g, b.trim());
+  return out;
 }
 
 function generateLines(choices) {
-  const { feeling, anchor, form, sound, voice, turn } = choices;
+  const { feeling, anchor, b, time, form, sound, voice, turn, phrase, echo } = choices;
+  const hasB = !!b.trim();
 
-  const openLine  = getLines(feeling, sound, 'open',  1)[0];
-  const closeLine = getLines(feeling, sound, 'close', 1)[0];
-  const turnLine  = turn !== 'none' ? getLines(feeling, sound, 'turn', 1)[0] : null;
+  const openLine  = getLines(feeling, sound, 'open',  1, hasB)[0];
+  const closeLine = getLines(feeling, sound, 'close', 1, hasB)[0];
+  const turnLine  = turn !== 'none' ? getLines(feeling, sound, 'turn', 1, hasB)[0] : null;
 
-  // middle line count by form
   const midCounts = {
     short_lines:  7,
     long_breath:  5,
@@ -654,10 +719,15 @@ function generateLines(choices) {
   };
 
   const n    = midCounts[form] || 5;
-  const mids = getLines(feeling, sound, 'mid', n).map(l => l.t);
+  const mids = getLines(feeling, sound, 'mid', n, hasB).map(l => l.t);
 
-  // assemble: open → mids → turn (optional) → close
-  let lines = [openLine.t, ...mids];
+  // ── assemble core lines ──────────────────────────────────────────────────
+
+  // insert time line (if provided) right after opening, before any transforms
+  const openingLines = [openLine.t];
+  if (time.trim()) openingLines.push(time.trim());
+
+  let lines = [...openingLines, ...mids];
 
   if (turn === 'midway' && turnLine) {
     const mid = Math.floor(lines.length / 2);
@@ -667,18 +737,36 @@ function generateLines(choices) {
   lines.push(closeLine.t);
 
   if (turn === 'end' && turnLine) {
-    // insert turn before final closing line
     lines.splice(lines.length - 1, 0, turnLine.t);
   }
 
-  // apply form structure
+  // ── apply form, voice, tokens ────────────────────────────────────────────
+
   lines = applyForm(lines, form, feeling);
 
-  // apply voice and anchor
-  return lines.map(l => {
+  lines = lines.map(l => {
     if (l === '') return '';
-    return applyAnchor(applyVoice(l, voice), anchor);
+    return applyTokens(applyVoice(l, voice), anchor, b);
   });
+
+  // ── weave in user's own words verbatim (after all transforms) ────────────
+
+  // phrase: inserted at the poem's midpoint
+  if (phrase.trim()) {
+    const mid = Math.floor(lines.length / 2);
+    lines.splice(mid, 0, phrase.trim());
+  }
+
+  // echo: bare word alone on a line, twice — early and near the close
+  if (echo.trim()) {
+    const w = echo.trim();
+    const late  = Math.max(lines.length - 1, 1);
+    const early = Math.min(2, late - 1);
+    lines.splice(late,  0, w);
+    lines.splice(early, 0, w);
+  }
+
+  return lines;
 }
 
 function applyForm(lines, form, feeling) {
@@ -761,10 +849,14 @@ function poemAsText(lines) {
 const choices = {
   feeling: 'melancholy',
   anchor:  '',
+  b:       '',       // second image
+  time:    '',       // the time
   form:    'short_lines',
   sound:   'soft',
   voice:   'I',
   turn:    'end',
+  phrase:  '',       // phrase to keep (verbatim)
+  echo:    '',       // recurring word (appears alone, twice)
 };
 
 let poemLines = [];
@@ -856,12 +948,22 @@ buildOpts('opts-sound',   'sound',   SOUNDS);
 buildOpts('opts-voice',   'voice',   VOICES);
 buildOpts('opts-turn',    'turn',    TURNS);
 
-// anchor input
-const anchorInput = document.getElementById('anchorInput');
-anchorInput.addEventListener('input', () => {
-  choices.anchor = anchorInput.value;
-  scheduleRegen();
-});
+// text inputs — anchor and the four new ones
+const anchorInput   = document.getElementById('anchorInput');
+const contrastInput = document.getElementById('contrastInput');
+const timeInput     = document.getElementById('timeInput');
+const phraseInput   = document.getElementById('phraseInput');
+const echoInput     = document.getElementById('echoInput');
+
+function textInput(el, key) {
+  el.addEventListener('input', () => { choices[key] = el.value; scheduleRegen(); });
+}
+
+textInput(anchorInput,   'anchor');
+textInput(contrastInput, 'b');
+textInput(timeInput,     'time');
+textInput(phraseInput,   'phrase');
+textInput(echoInput,     'echo');
 
 // actions
 document.getElementById('regenBtn').addEventListener('click', renderPoem);
