@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wander</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #f5f1ea;
+    --surface:     #faf7f2;
+    --text:        #2a2320;
+    --text-muted:  #9a8a7a;
+    --accent:      #8b5e3c;
+    --word-hover:  #ede5d8;
+    --word-active: #c9a97a;
+    --border:      #ddd4c4;
+  }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── header ── */
+  header {
+    padding: 0.8rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  .title {
+    font-size: 1rem;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    font-style: italic;
+    flex-shrink: 0;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+  }
+
+  .seed-input {
+    font-family: Georgia, serif;
+    font-size: 0.9rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0.2rem 0.3rem;
+    color: var(--text);
+    width: 110px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .seed-input::placeholder { color: var(--text-muted); font-style: italic; }
+  .seed-input:focus { border-bottom-color: var(--accent); }
+
+  .drift-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  .drift-val {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    width: 2.2rem;
+  }
+
+  .btn {
+    font-family: Georgia, serif;
+    font-size: 0.82rem;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.28rem 0.75rem;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .btn:hover:not(:disabled) { background: var(--word-hover); border-color: var(--text-muted); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+
+  .current-indicator {
+    margin-left: auto;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-style: italic;
+    min-width: 120px;
+    text-align: right;
+    transition: opacity 0.3s;
+  }
+
+  /* ── main ── */
+  main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── output panel ── */
+  .output {
+    flex: 1;
+    padding: 2.5rem 4rem 2.5rem 3.5rem;
+    overflow-y: auto;
+    line-height: 2.1;
+    font-size: 1.1rem;
+  }
+
+  .fragment {
+    display: block;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+
+  .fragment.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  .fragment.pause { height: 0.9em; }
+
+  .fragment.breath { color: var(--text-muted); }
+
+  /* ── graph panel ── */
+  .graph {
+    width: 230px;
+    border-left: 1px solid var(--border);
+    padding: 1.4rem 1.1rem;
+    overflow-y: auto;
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  .field-section { margin-bottom: 1.3rem; }
+
+  .field-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.45rem;
+    font-family: 'Courier New', monospace;
+    transition: color 0.3s;
+  }
+
+  .field-label.active { color: var(--accent); }
+
+  .word-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.2rem;
+  }
+
+  .chip {
+    font-size: 0.82rem;
+    padding: 0.1rem 0.35rem;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.15s;
+    color: var(--text);
+    border: 1px solid transparent;
+  }
+
+  .chip:hover { background: var(--word-hover); }
+
+  .chip.active {
+    background: var(--word-active);
+    border-color: #b8935a;
+  }
+
+  /* ── scrollbar ── */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">wander</span>
+  <div class="controls">
+    <input class="seed-input" id="seedInput" type="text" placeholder="seed word…" value="drift">
+    <div class="drift-group">
+      <span class="label">drift</span>
+      <input type="range" id="driftSlider" min="0" max="1" step="0.05" value="0.3">
+      <span class="drift-val" id="driftVal">0.30</span>
+    </div>
+    <button class="btn" id="wanderBtn">wander</button>
+    <button class="btn" id="stopBtn" disabled>stop</button>
+  </div>
+  <span class="current-indicator" id="indicator"></span>
+</header>
+
+<main>
+  <div class="output" id="output"></div>
+  <div class="graph"  id="graph"></div>
+</main>
+
+<script>
+// ── word graph ────────────────────────────────────────────────────────────────
+
+const FIELDS = {
+  water: ["rain", "river", "tide", "surface", "current", "still", "depth", "cold"],
+  light: ["shadow", "flicker", "pale", "dim", "dusk", "dawn", "glow", "fade"],
+  time:  ["moment", "before", "after", "wait", "linger", "return", "edge", "pass"],
+  body:  ["breath", "hand", "eye", "voice", "skin", "weight", "hollow", "pulse"],
+  earth: ["stone", "root", "dust", "ground", "seed", "crack", "layer", "dark"],
+  air:   ["wind", "open", "empty", "lift", "drift", "gone", "thin", "rise"],
+  mind:  ["echo", "dream", "forget", "strange", "wake", "lost", "word", "become"],
+};
+
+const BRIDGES = {
+  rain:    ["cold", "stone", "wait", "pale"],
+  still:   ["hollow", "moment", "empty", "dark"],
+  depth:   ["dark", "hollow", "before", "cold"],
+  cold:    ["stone", "empty", "fade", "skin"],
+  shadow:  ["dark", "hollow", "edge", "dream"],
+  dusk:    ["return", "stone", "breath", "wait"],
+  dawn:    ["breath", "pale", "before", "lift"],
+  fade:    ["linger", "still", "pale", "gone"],
+  moment:  ["breath", "edge", "flicker", "hand"],
+  before:  ["dream", "root", "wait", "cold"],
+  wait:    ["still", "breath", "shadow", "linger"],
+  linger:  ["shadow", "cold", "hollow", "echo"],
+  edge:    ["crack", "moment", "thin", "pale"],
+  breath:  ["wind", "moment", "pale", "voice"],
+  hollow:  ["echo", "dark", "empty", "stone"],
+  weight:  ["stone", "ground", "dark", "drift"],
+  pulse:   ["river", "moment", "breath", "flicker"],
+  stone:   ["cold", "root", "ground", "still"],
+  root:    ["dark", "ground", "before", "weight"],
+  dust:    ["gone", "drift", "pale", "forget"],
+  crack:   ["edge", "dark", "still", "thin"],
+  drift:   ["gone", "dream", "pale", "linger"],
+  gone:    ["before", "dust", "empty", "echo"],
+  rise:    ["dawn", "lift", "breath", "before"],
+  echo:    ["hollow", "voice", "return", "linger"],
+  dream:   ["drift", "shadow", "before", "strange"],
+  wake:    ["dawn", "breath", "moment", "cold"],
+  lost:    ["drift", "dark", "gone", "hollow"],
+  word:    ["echo", "voice", "breath", "strange"],
+  become:  ["return", "before", "strange", "drift"],
+};
+
+const TEMPLATES = [
+  "the %w",
+  "%w",
+  "%w, %f",
+  "the %w of %f",
+  "a kind of %w",
+  "toward the %w",
+  "where %f meets %w",
+  "inside the %w",
+  "not %f, but %w",
+  "%f into %w",
+  "the %f of %w",
+  "what %w becomes",
+  "%w without %f",
+  "%w again",
+  "there is %w here",
+  "something like %w",
+  "between %f and %w",
+  "the %w holds",
+  "%w, almost %f",
+  "still %w",
+  "how %w becomes %f",
+  "the sound of %w",
+  "before the %w",
+  "%w returning",
+  "like %f, like %w",
+];
+
+const BREATH = ["", "", "", "...", "—"];
+
+const WORD_FIELD = {};
+for (const [field, words] of Object.entries(FIELDS))
+  for (const w of words) WORD_FIELD[w] = field;
+const ALL_WORDS = Object.keys(WORD_FIELD);
+
+// ── graph logic ───────────────────────────────────────────────────────────────
+
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+function kin(word) {
+  const f = WORD_FIELD[word];
+  return f ? FIELDS[f].filter(w => w !== word) : [];
+}
+
+function neighbors(word, drift) {
+  const close = kin(word);
+  const far   = BRIDGES[word] || [];
+  if (Math.random() < drift && far.length)
+    return [...close, ...far, ...far];
+  return close.length ? close : ALL_WORDS.slice();
+}
+
+function nextWord(current, trail, drift) {
+  let pool = neighbors(current, drift).filter(w => !trail.slice(-4).includes(w));
+  if (!pool.length) pool = ALL_WORDS.filter(w => w !== current);
+  return pick(pool);
+}
+
+function makeFragment(word, trail) {
+  let candidates = kin(word).filter(w => !trail.slice(-3).includes(w));
+  if (!candidates.length) candidates = kin(word).length ? kin(word) : ALL_WORDS;
+  return pick(TEMPLATES)
+    .replace(/%w/g, word)
+    .replace(/%f/g, pick(candidates));
+}
+
+// ── ui helpers ────────────────────────────────────────────────────────────────
+
+const output    = document.getElementById('output');
+const indicator = document.getElementById('indicator');
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function addFragment(text) {
+  const el = document.createElement('div');
+  el.className = 'fragment'
+    + (text === '' ? ' pause' : '')
+    + (text === '...' || text === '—' ? ' breath' : '');
+  el.textContent = text;
+  output.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+  output.scrollTop = output.scrollHeight;
+}
+
+function highlight(word) {
+  const field = WORD_FIELD[word];
+  document.querySelectorAll('.chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.word === word));
+  document.querySelectorAll('.field-label').forEach(l =>
+    l.classList.toggle('active', l.dataset.field === field));
+  indicator.textContent = field ? `${word} · ${field}` : '';
+}
+
+// ── wander loop ───────────────────────────────────────────────────────────────
+
+let stopFlag = false;
+let running  = false;
+
+async function wander(seed, steps, drift, delay) {
+  running  = true;
+  stopFlag = false;
+  document.getElementById('wanderBtn').disabled = true;
+  document.getElementById('stopBtn').disabled   = false;
+
+  let current = WORD_FIELD[seed]
+    ? seed
+    : pick(ALL_WORDS);
+
+  if (seed && !WORD_FIELD[seed]) {
+    addFragment(seed);
+    addFragment('');
+    await sleep(delay);
+  }
+
+  let trail = [current];
+  highlight(current);
+
+  for (let i = 0; i < steps && !stopFlag; i++) {
+    if (Math.random() < 0.12) {
+      addFragment(pick(BREATH));
+      await sleep(delay * 0.6);
+      continue;
+    }
+
+    addFragment(makeFragment(current, trail));
+    await sleep(delay);
+
+    if (Math.random() < 0.18) addFragment('');
+
+    current = nextWord(current, trail, drift);
+    trail.push(current);
+    if (trail.length > 12) trail = trail.slice(-12);
+    highlight(current);
+  }
+
+  addFragment('');
+  running  = false;
+  stopFlag = false;
+  indicator.textContent = '';
+  document.getElementById('wanderBtn').disabled = false;
+  document.getElementById('stopBtn').disabled   = true;
+}
+
+function startWander(seed) {
+  const drift = parseFloat(document.getElementById('driftSlider').value);
+  if (running) {
+    stopFlag = true;
+    output.innerHTML = '';
+    setTimeout(() => wander(seed || 'drift', 28, drift, 350), 60);
+  } else {
+    output.innerHTML = '';
+    wander(seed || 'drift', 28, drift, 350);
+  }
+}
+
+// ── build graph ───────────────────────────────────────────────────────────────
+
+const graphEl = document.getElementById('graph');
+
+for (const [field, words] of Object.entries(FIELDS)) {
+  const section = document.createElement('div');
+  section.className = 'field-section';
+
+  const label = document.createElement('div');
+  label.className = 'field-label';
+  label.dataset.field = field;
+  label.textContent = field;
+  section.appendChild(label);
+
+  const chips = document.createElement('div');
+  chips.className = 'word-chips';
+
+  for (const word of words) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.dataset.word = word;
+    chip.textContent = word;
+    chip.addEventListener('click', () => {
+      document.getElementById('seedInput').value = word;
+      startWander(word);
+    });
+    chips.appendChild(chip);
+  }
+
+  section.appendChild(chips);
+  graphEl.appendChild(section);
+}
+
+// ── events ────────────────────────────────────────────────────────────────────
+
+document.getElementById('driftSlider').addEventListener('input', e => {
+  document.getElementById('driftVal').textContent =
+    parseFloat(e.target.value).toFixed(2);
+});
+
+document.getElementById('wanderBtn').addEventListener('click', () => {
+  startWander(document.getElementById('seedInput').value.trim().toLowerCase());
+});
+
+document.getElementById('stopBtn').addEventListener('click', () => { stopFlag = true; });
+
+document.getElementById('seedInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter')
+    startWander(e.target.value.trim().toLowerCase());
+});
+
+// ── start ─────────────────────────────────────────────────────────────────────
+
+startWander('drift');
+</script>
+</body>
+</html>
